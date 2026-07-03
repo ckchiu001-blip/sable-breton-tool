@@ -1,0 +1,1758 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>A Cooking Day 專業食品標籤設計器 3.4 Pro (無損完美導出版)</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts 藝術與專業字體 -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400&family=Inter:wght@300;400;500;600;700&family=Playfair+Display:ital,wght@0,400;0,600&family=Montserrat:wght@400;600&display=swap" rel="stylesheet">
+    
+    <!-- 引入 html2canvas 用於匯出圖片 -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <!-- 引入 qrcode.js 用於動態生成 QR Code -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+
+    <style>
+        /* 核心樣式：鎖定固定畫布大小，預防一切因瀏覽器自動計算導致的變形 */
+        :root {
+            --label-bg: #FFFFFF; /* 底色鎖定純白 */
+            --label-text: #1C2321;
+            --label-accent: #A38051;
+            --font-scale: 1.0; /* 整體文字縮放 (不包含主標題) */
+            --title-scale: 1.0; /* 標題獨立縮放 */
+            --logo-scale: 1.0; /* Logo 獨立縮放 */
+            --qr-scale: 1.0; /* QR Code 獨立縮放 */
+            --preview-zoom: 0.7; /* 預設視覺縮放比例降至 70% */
+            
+            /* 動態標籤寬高尺寸 (預設為 350x420) */
+            --label-width: 350px;
+            --label-height: 420px;
+            --viewport-height: 320px; /* 視窗初始預設高度 */
+            
+            /* 1.2mm 實體字體物理底線保障變數 */
+            --min-print-font: 8.4px; 
+
+            /* 四大間距控制變數 (預設皆為 0.015) */
+            --top-gap: 0.015;
+            --allergen-gap: 0.015;
+            --netweight-gap: 0.015;
+            --footer-gap: 0.015;
+            
+            /* 底部位置位移與主標題位移微調 */
+            --footer-offset: 0.00;
+            --title-offset: 0.00;
+            --address-scale: 1.0;
+        }
+
+        /* 標籤預覽容器 */
+        .label-preview-container {
+            width: var(--label-width) !important;
+            height: var(--label-height) !important;
+            background-color: var(--label-bg);
+            box-shadow: 0 10px 25px -5px rgba(0,0,0,0.12);
+            position: relative;
+            box-sizing: border-box;
+            transition: width 0.2s ease, height 0.2s ease;
+        }
+
+        /* ==== 絕對安全與比例同型的排版設計，加入 whitespace-pre-wrap 完美支援換行 ==== */
+        .dynamic-title {
+            font-size: calc(var(--label-width) * 0.06 * var(--title-scale)) !important;
+            line-height: 1.2 !important;
+            white-space: pre-wrap !important;
+        }
+        
+        /* 鎖定 1.2mm 法律防守底線 */
+        .dynamic-body {
+            font-size: max(var(--min-print-font), calc(var(--label-width) * 0.024 * var(--font-scale))) !important;
+            line-height: 1.35 !important;
+            white-space: pre-wrap !important;
+            text-align: center !important; /* 確保成分配料字體與標題一樣完美居中 */
+            width: 100% !important;
+            display: block !important;
+        }
+        .dynamic-warning-title {
+            font-size: max(var(--min-print-font), calc(var(--label-width) * 0.022 * var(--font-scale))) !important;
+            line-height: 1.2 !important;
+            white-space: pre-wrap !important;
+        }
+        .dynamic-warning-body {
+            font-size: max(var(--min-print-font), calc(var(--label-width) * 0.021 * var(--font-scale))) !important;
+            line-height: 1.2 !important;
+            white-space: pre-wrap !important;
+        }
+        
+        /* 底部資訊欄強制鎖定與支援換行 */
+        .dynamic-footer-label {
+            font-size: max(var(--min-print-font), calc(var(--label-width) * 0.018 * var(--font-scale))) !important;
+            line-height: 1.1 !important;
+            color: var(--label-text) !important;
+            opacity: 0.85; 
+            white-space: pre-wrap !important;
+        }
+        .dynamic-footer-value {
+            font-size: max(var(--min-print-font), calc(var(--label-width) * 0.0215 * var(--font-scale))) !important;
+            line-height: 1.1 !important;
+            color: var(--label-text) !important;
+            font-weight: 700 !important;
+            white-space: pre-wrap !important;
+        }
+
+        /* 邊框與間距 */
+        .outer-border-frame {
+            border: calc(var(--label-width) * 0.003) solid var(--label-accent);
+            padding: calc(var(--label-width) * 0.008);
+            height: 100%;
+            box-sizing: border-box;
+        }
+        .inner-border-frame {
+            border: calc(var(--label-width) * 0.008) double var(--label-accent);
+            padding: calc(var(--label-width) * 0.028) calc(var(--label-width) * 0.034) calc(var(--label-width) * 0.018) calc(var(--label-width) * 0.034);
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            box-sizing: border-box;
+        }
+
+        /* 分割線 */
+        .dynamic-divider {
+            width: 60%;
+            height: calc(var(--label-width) * 0.002);
+            margin: calc(var(--label-width) * 0.015) auto;
+            opacity: 0.6;
+            background-color: var(--label-accent);
+        }
+
+        /* 裝飾圖示 */
+        .dynamic-crest {
+            height: calc(var(--label-width) * 0.04);
+            width: calc(var(--label-width) * 0.04);
+            margin: 0 auto calc(var(--label-width) * 0.008) auto;
+        }
+        
+        .logo-wrapper {
+            max-width: calc(var(--label-width) * 0.18 * var(--logo-scale));
+            max-height: calc(var(--label-width) * 0.10 * var(--logo-scale));
+            margin: 0 auto calc(var(--label-width) * 0.008) auto;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        /* QR Code */
+        .qr-wrapper {
+            width: calc(var(--label-width) * 0.13 * var(--qr-scale));
+            height: calc(var(--label-width) * 0.13 * var(--qr-scale));
+            background: white;
+            padding: calc(var(--label-width) * 0.005);
+            border: 1px solid #ddd;
+            display: inline-block;
+        }
+        .qr-wrapper canvas, .qr-wrapper img {
+            width: 100% !important;
+            height: 100% !important;
+        }
+
+        /* 成分與過敏提示自訂上下間距 */
+        .allergen-spacing-box {
+            margin-top: calc(var(--label-width) * var(--allergen-gap)) !important;
+            margin-bottom: calc(var(--label-width) * var(--allergen-gap)) !important;
+        }
+
+        /* 預覽視窗大小控管 */
+        #label-viewport {
+            height: var(--viewport-height) !important;
+            min-height: var(--viewport-height) !important;
+            max-height: var(--viewport-height) !important;
+        }
+
+        /* 垂直推軌式滑桿：加長、加粗，並配備超大觸控按鈕 */
+        .vertical-slider {
+            -webkit-appearance: none;
+            appearance: none;
+            writing-mode: vertical-lr;           
+            direction: rtl;                      
+            height: 110px;                       
+            width: 16px;                         
+            background: #e2e8f0;                 
+            border-radius: 9999px;
+            outline: none;
+            cursor: pointer;
+        }
+
+        /* 訂製滑桿軌道 */
+        .vertical-slider::-webkit-slider-runnable-track {
+            width: 16px;
+            height: 110px;
+            background: #e2e8f0;
+            border-radius: 9999px;
+        }
+
+        /* 極大化滑軌圓鈕：大拇指觸控神器 */
+        .vertical-slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 30px;                         
+            height: 30px;
+            border-radius: 50%;
+            background: #059669;                 
+            border: 3px solid #ffffff;           
+            box-shadow: 0 3px 8px rgba(0,0,0,0.25);
+            cursor: pointer;
+            margin-top: 0px;                     
+        }
+
+        /* Firefox 兼容性設定 */
+        .vertical-slider::-moz-range-track {
+            width: 16px;
+            height: 110px;
+            background: #e2e8f0;
+            border-radius: 9999px;
+        }
+        .vertical-slider::-moz-range-thumb {
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            background: #059669;
+            border: 3px solid #ffffff;
+            box-shadow: 0 3px 8px rgba(0,0,0,0.25);
+            cursor: pointer;
+        }
+
+        /* 自定義 TextArea 風格 */
+        .custom-textarea {
+            width: 100%;
+            padding: 8px 12px;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            font-size: 13px;
+            line-height: 1.4;
+            outline: none;
+            resize: vertical;
+            transition: all 0.15s ease-in-out;
+        }
+        .custom-textarea:focus {
+            border-color: #d97706; /* amber-600 */
+            box-shadow: 0 0 0 2px rgba(217, 119, 6, 0.15);
+        }
+
+        /* ================= 列印專用樣式 ================= */
+        @media print {
+            .no-print {
+                display: none !important;
+            }
+            .print-wrapper {
+                display: block !important;
+                position: absolute;
+                left: 0;
+                top: 0;
+                box-sizing: border-box !important;
+                overflow: hidden !important;
+            }
+        }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800 font-sans min-h-screen flex flex-col">
+
+    <!-- 提示通知 Banner -->
+    <div id="toast" class="fixed top-5 left-1/2 transform -translate-x-1/2 bg-slate-900 text-white px-5 py-2.5 rounded-xl shadow-xl text-xs font-semibold tracking-wide transition-all duration-300 opacity-0 pointer-events-none z-[999]">
+        設定儲存成功！
+    </div>
+
+    <!-- 頂部控制列 -->
+    <header class="no-print bg-white border-b border-slate-200 py-3 px-4 sticky top-0 z-50 shadow-sm">
+        <div class="max-w-7xl mx-auto flex items-center justify-between gap-2">
+            <!-- 【修改需求：使用 CSS Flexbox 垂直居中對齊，間距 10px】 -->
+            <div class="flex items-center gap-3">
+                <!-- 【修改需求：左上角加入 A Cooking Day 專屬 Logo，高度限制在 28-32px，並保留 fallback 圖示防止錯誤】 -->
+                <img src="https://raw.githubusercontent.com/ckchiu001-blip/TOOL-PHOTO/refs/heads/main/(%E9%9B%BB%E8%85%A6%E7%94%A8)%20-A%20Cooking%20Day%20logo-RGB%20.png?token=GHSAT0AAAAAAD7YWZTBDMEDRLSSFT2K4YSY2SH3EUQ" onerror="this.onerror=null; this.src='https://cdn-icons-png.flaticon.com/512/992/992717.png';" alt="Logo" class="object-contain" style="height: 28px; width: auto; max-height: 32px;">
+                <div>
+                    <!-- 【修改需求：變更標籤器名稱，移除 Sablé Breton 欄字】 -->
+                    <h1 class="text-sm font-bold text-slate-900 leading-tight">A Cooking Day 專業標籤設計器 3.4 Pro</h1>
+                    <p class="text-[10px] text-slate-500 hidden sm:block">置頂預覽版 • 鎖定 FFFFFF 純白紙張</p>
+                </div>
+            </div>
+            
+            <button onclick="exportLabelAsPNG()" class="flex items-center justify-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-2 rounded-lg font-semibold text-xs transition-all shadow-sm">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                </svg>
+                下載超清 PNG
+            </button>
+        </div>
+    </header>
+
+    <!-- 主要操作與預覽區 -->
+    <main class="flex-1 max-w-7xl mx-auto w-full p-3 sm:p-4 lg:p-6 flex flex-col gap-4">
+        
+        <!-- 【常駐置頂浮動面板】 -->
+        <section class="w-full sticky top-[45px] md:top-[60px] z-40 bg-slate-50/95 backdrop-blur-md pt-3 shadow-md -mx-3 px-3 sm:mx-0 sm:px-0 sm:rounded-t-2xl border-b md:border border-slate-200">
+            <div class="max-w-4xl mx-auto flex flex-row gap-3 items-stretch justify-center pb-2 w-full px-2">
+                
+                <!-- 控制盒 -->
+                <div class="flex flex-col justify-between items-center bg-white rounded-2xl border border-slate-200 p-2 shadow-sm w-[112px] shrink-0 text-center">
+                    
+                    <div class="flex flex-col items-center">
+                        <span class="text-[9px] font-bold text-slate-400 leading-none">預覽縮放</span>
+                        <span id="zoom-factor" class="text-[10px] font-extrabold text-emerald-800 bg-emerald-50 px-1.5 py-0.5 rounded-full mt-1">70%</span>
+                    </div>
+                    
+                    <div class="flex-1 flex items-center justify-center my-3">
+                        <input type="range" id="preview-zoom-slider" min="0.3" max="2.5" step="0.01" value="0.70" class="vertical-slider" oninput="updatePreviewZoom(this.value)">
+                    </div>
+                    
+                    <div class="flex flex-row gap-1 w-full mt-1 shrink-0 items-center justify-center">
+                        <button onclick="adjustPreviewZoom(-0.05)" class="h-8 bg-emerald-50 hover:bg-emerald-100 active:bg-emerald-200 rounded-lg text-slate-800 font-extrabold text-xs border border-slate-200/60 flex-1 flex items-center justify-center shadow-sm">-</button>
+                        <button onclick="updatePreviewZoom(0.70); document.getElementById('preview-zoom-slider').value = 0.70;" class="h-8 px-1.5 bg-slate-50 hover:bg-slate-100 rounded-lg text-slate-600 font-bold text-[8.5px] border border-slate-200/60 flex items-center justify-center shrink-0">重設</button>
+                        <button onclick="adjustPreviewZoom(0.05)" class="h-8 bg-emerald-50 hover:bg-emerald-100 active:bg-emerald-200 rounded-lg text-slate-800 font-extrabold text-xs border border-slate-200/60 flex-1 flex items-center justify-center shadow-sm">+</button>
+                    </div>
+                </div>
+
+                <!-- 標籤可視窗口 -->
+                <div id="label-viewport" class="flex-1 max-w-[280px] sm:max-w-[350px] flex items-center justify-center bg-slate-200 border-2 border-dashed border-slate-300 rounded-2xl overflow-hidden p-2 relative shadow-inner">
+                    <div id="label-scale-pivot" class="absolute flex items-center justify-center overflow-visible" style="transform: scale(var(--preview-zoom, 0.7)); transform-origin: center center; transition: transform 0.1s ease-out;">
+                        <div id="printable-label" class="label-preview-container">
+                            <div id="outer-border-wrapper" class="outer-border-frame">
+                                <div id="inner-border-wrapper" class="inner-border-frame">
+                                    
+                                    <div class="text-center flex flex-col justify-start">
+                                        <svg id="decor-crest" class="dynamic-crest text-[var(--label-accent)]" fill="currentColor" viewBox="0 0 24 24">
+                                            <path d="M12 2C11.5 2 11 3.5 11 5C11 6.5 11.5 8 12 8C12.5 8 13 6.5 13 5C13 3.5 12.5 2 12 2M12 9C9 9 7.5 10.5 7.5 12C7.5 13.5 9 15 12 15C15 15 16.5 13.5 16.5 12C16.5 10.5 15 9 12 9M12 16C11 16 10 17 10 18.5C10 20 11 22 12 22C13 22 14 20 14 18.5C14 17 13 16 12 16Z"/>
+                                        </svg>
+                                        
+                                        <div id="logo-container" class="logo-wrapper hidden">
+                                            <img id="label-logo-img" src="" alt="Custom Logo" class="max-w-full max-h-full object-contain">
+                                        </div>
+                                        
+                                        <!-- 主標題支援上下位移微調 -->
+                                        <h2 id="label-title" class="dynamic-title font-bold text-center tracking-wide" style="font-family: 'Cinzel', serif; color: var(--label-text); transform: translateY(calc(var(--label-width) * var(--title-offset, 0))) !important;">
+                                            ORIGINAL FRENCH SABLÉ BRETON
+                                        </h2>
+                                        
+                                        <div class="dynamic-divider"></div>
+                                    </div>
+
+                                    <!-- 中間：成分與過敏警告 -->
+                                    <div id="middle-container" class="flex-1 flex flex-col justify-center" style="margin-top: calc(var(--label-width) * var(--top-gap)) !important;">
+                                        
+                                        <div class="w-full text-center">
+                                            <div class="dynamic-warning-title font-bold text-slate-900 uppercase tracking-wider text-center block mb-0.5" style="white-space: nowrap !important; width: 100% !important; text-align: center !important;">
+                                                INGREDIENTS:
+                                            </div>
+                                            <span id="label-ingredients" class="dynamic-body block text-slate-700 font-sans text-center">WHEAT Flour (GLUTEN), BUTTER (MILK) (QUID 30%), Icing Sugar, EGG, Salt, Baking Powder (Raising Agents: Disodium Diphosphate, Sodium Hydrogen Carbonate; Rice Flour).</span>
+                                        </div>
+                                        
+                                        <!-- 【修改需求：徹底移除原本卡片預覽中的 ⚠️ ALLERGEN WARNING 標題文字，只保留內容框線與過敏原字眼】 -->
+                                        <div class="border-t border-b border-dashed border-slate-300 py-1 text-center" style="margin-top: calc(var(--label-width) * var(--allergen-gap)) !important; margin-bottom: calc(var(--label-width) * var(--netweight-gap)) !important;">
+                                            <span id="label-allergen" class="dynamic-warning-body block text-slate-600 text-center" style="font-family: 'Inter', sans-serif;">
+                                                For allergens, see ingredients listed in BOLD.
+                                            </span>
+                                        </div>
+
+                                        <!-- 移除了中間垂直分隔線「|」，增加左右自適應間距，使得版面清爽乾淨 -->
+                                        <div class="text-center py-0.5 flex flex-wrap justify-center items-center gap-x-4 text-slate-700" style="font-family: 'Inter', sans-serif; margin-bottom: calc(var(--label-width) * var(--footer-gap)) !important;">
+                                            <span id="label-storage" class="dynamic-warning-body italic">Store in a cool, dry place.</span>
+                                            <span id="label-net-weight" class="dynamic-warning-body font-bold">Net Weight: 150g</span>
+                                        </div>
+                                    </div>
+
+                                    <!-- 底部資訊欄（移除了原本最底部的水平分隔實線，支援 CSS 動態向上移位） -->
+                                    <div id="label-footer-section" class="text-center pt-1" style="font-family: 'Inter', sans-serif; transform: translateY(calc(var(--label-width) * var(--footer-offset, 0))) !important;">
+                                        <div id="qr-container" class="hidden mb-1 text-center">
+                                            <div class="qr-wrapper">
+                                                <div id="label-qr-code"></div>
+                                            </div>
+                                        </div>
+
+                                        <div class="flex justify-between items-start gap-1 w-full text-slate-800 pb-1 border-b border-slate-100/50">
+                                            <div class="text-left shrink-0" style="white-space: nowrap !important;">
+                                                <span class="block dynamic-footer-label uppercase">BEST BEFORE:</span>
+                                                <strong id="label-bb-date" class="dynamic-footer-value">21 / 06 / 2026</strong>
+                                            </div>
+                                            <div class="text-right shrink-0" style="white-space: nowrap !important;">
+                                                <span class="block dynamic-footer-label uppercase">PRODUCED BY:</span>
+                                                <strong id="label-maker" class="dynamic-footer-value">A Cooking Day (CH3 6ET)</strong>
+                                            </div>
+                                        </div>
+
+                                        <!-- 地址支援獨立字體縮放滑桿，防止空間不足截斷 -->
+                                        <div class="w-full text-center mt-1">
+                                            <span id="label-address" class="dynamic-footer-label block text-center italic" style="font-size: max(var(--min-print-font), calc(var(--label-width) * 0.018 * var(--address-scale))) !important;">Factory Address: CH3 6ET, UK</span>
+                                        </div>
+                                    </div>
+
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- ↕️ 上下拖曳高度控制條 -->
+            <div id="viewport-drag-handle" class="no-print h-6 flex items-center justify-center cursor-row-resize select-none bg-slate-100 hover:bg-slate-200 active:bg-amber-100 border-t border-slate-200 mt-2 -mx-3 px-3 sm:mx-0 sm:px-0 sm:rounded-b-2xl transition-all">
+                <div class="flex items-center gap-1.5">
+                    <span class="text-[10px] font-bold text-slate-400 tracking-wider">↕️ 按住上下拖曳預覽高度</span>
+                    <div class="w-8 h-1 bg-slate-300 rounded-full"></div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 下方表單與微調控制面板 -->
+        <section class="w-full bg-white rounded-2xl border border-slate-200 shadow-sm p-4 md:p-6 flex flex-col gap-5">
+            
+            <!-- 比例與間距控制面板 -->
+            <div class="w-full bg-slate-50/50 rounded-xl border border-slate-200/80 p-4 flex flex-col gap-4">
+                <div class="flex justify-between items-center border-b border-slate-100 pb-2">
+                    <span class="text-xs font-bold text-slate-700 flex items-center gap-1.5">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
+                        </svg>
+                        獨立元素與間距尺寸調校 (Sizing & Spacing)
+                    </span>
+                    <span id="label-dimension-tag" class="text-[10px] font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-full">50x60mm</span>
+                </div>
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <div class="flex justify-between text-[11px] text-slate-600 mb-1">
+                            <span>整體內容文字縮放 (All Body Texts) (除主標題外)</span>
+                            <span id="all-scale-num" class="font-bold text-amber-800">100%</span>
+                        </div>
+                        <input type="range" id="scale-all" min="1.0" max="3.0" step="0.05" value="1.00" class="w-full h-1.5 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-amber-600" oninput="updateFontScale('all', this.value)">
+                    </div>
+
+                    <div>
+                        <div class="flex justify-between text-[11px] text-slate-600 mb-1">
+                            <span>主標題字體大小 (Product Title Only)</span>
+                            <span id="title-scale-num" class="font-bold text-amber-800">100%</span>
+                        </div>
+                        <input type="range" id="scale-title" min="0.5" max="2.0" step="0.05" value="1.00" class="w-full h-1.5 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-amber-600" oninput="updateFontScale('title', this.value)">
+                    </div>
+
+                    <div id="logo-slider-group" class="hidden">
+                        <div class="flex justify-between text-[11px] text-slate-600 mb-1">
+                            <span>Logo 圖片大小 (Logo Size)</span>
+                            <span id="logo-scale-num" class="font-bold text-amber-800">100%</span>
+                        </div>
+                        <input type="range" id="scale-logo" min="0.5" max="2.0" step="0.1" value="1.00" class="w-full h-1.5 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-amber-600" oninput="updateFontScale('logo', this.value)">
+                    </div>
+
+                    <div id="qr-slider-group" class="hidden">
+                        <div class="flex justify-between text-[11px] text-slate-600 mb-1">
+                            <span>QR Code 大小 (QR Size)</span>
+                            <span id="qr-scale-num" class="font-bold text-amber-800">100%</span>
+                        </div>
+                        <input type="range" id="scale-qr" min="0.6" max="1.5" step="0.05" value="1.00" class="w-full h-1.5 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-amber-600" oninput="updateFontScale('qr', this.value)">
+                    </div>
+
+                    <div>
+                        <div class="flex justify-between text-[11px] text-slate-600 mb-1">
+                            <span>標題與內容距離 (Title vs Content Spacing)</span>
+                            <span id="top-gap-scale-num" class="font-bold text-amber-800">15px</span>
+                        </div>
+                        <input type="range" id="scale-top-gap" min="-0.10" max="0.10" step="0.005" value="0.015" class="w-full h-1.5 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-amber-600" oninput="updateTopGap(this.value)">
+                    </div>
+
+                    <div>
+                        <div class="flex justify-between text-[11px] text-slate-600 mb-1">
+                            <span>成分與過敏警告框距離 (Ingredients vs Allergen Spacing)</span>
+                            <span id="gap-scale-num" class="font-bold text-amber-800">15px</span>
+                        </div>
+                        <input type="range" id="scale-gap" min="0.00" max="0.08" step="0.005" value="0.015" class="w-full h-1.5 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-amber-600" oninput="updateAllergenGap(this.value)">
+                    </div>
+
+                    <div>
+                        <div class="flex justify-between text-[11px] text-slate-600 mb-1">
+                            <span>警告框與淨重/貯存距離 (Allergen vs Net Weight Spacing)</span>
+                            <span id="netweight-gap-scale-num" class="font-bold text-amber-800">15px</span>
+                        </div>
+                        <input type="range" id="scale-netweight-gap" min="0.00" max="0.08" step="0.005" value="0.015" class="w-full h-1.5 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-amber-600" oninput="updateNetweightGap(this.value)">
+                    </div>
+
+                    <!-- 淨重/貯存與底部欄距離滑桿（已開放負數調整，適應緊湊排版） -->
+                    <div>
+                        <div class="flex justify-between text-[11px] text-slate-600 mb-1">
+                            <span>淨重/貯存與底部欄距離 (Net Weight vs Footer Spacing)</span>
+                            <span id="footer-gap-scale-num" class="font-bold text-amber-800">15px</span>
+                        </div>
+                        <input type="range" id="scale-footer-gap" min="-0.08" max="0.08" step="0.005" value="0.015" class="w-full h-1.5 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-amber-600" oninput="updateFooterGap(this.value)">
+                    </div>
+
+                    <div>
+                        <div class="flex justify-between text-[11px] text-slate-600 mb-1">
+                            <span>最底部資訊欄向上微調 (Footer Vertical Offset)</span>
+                            <span id="footer-offset-scale-num" class="font-bold text-amber-800">0 px</span>
+                        </div>
+                        <input type="range" id="scale-footer-offset" min="-0.15" max="0.05" step="0.005" value="0.00" class="w-full h-1.5 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-amber-600" oninput="updateFooterOffset(this.value)">
+                    </div>
+
+                    <!-- 地址大小獨立控制 -->
+                    <div>
+                        <div class="flex justify-between text-[11px] text-slate-600 mb-1">
+                            <span>地址字體大小 (Address Font Size Only)</span>
+                            <span id="address-scale-num" class="font-bold text-amber-800">100%</span>
+                        </div>
+                        <input type="range" id="scale-address" min="0.5" max="2.5" step="0.05" value="1.00" class="w-full h-1.5 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-amber-600" oninput="updateFontScale('address', this.value)">
+                    </div>
+
+                    <!-- 主標題上下位置微調 -->
+                    <div>
+                        <div class="flex justify-between text-[11px] text-slate-600 mb-1">
+                            <span>主標題上下位置微調 (Product Title Vertical Offset)</span>
+                            <span id="title-offset-scale-num" class="font-bold text-amber-800">0 px</span>
+                        </div>
+                        <input type="range" id="scale-title-offset" min="-0.15" max="0.15" step="0.005" value="0.00" class="w-full h-1.5 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-amber-600" oninput="updateTitleOffset(this.value)">
+                    </div>
+                </div>
+            </div>
+
+            <!-- 多配方 Profile 管理與 JSON 匯入出 -->
+            <div class="bg-slate-50 p-4 rounded-xl border border-slate-200/80">
+                <h2 class="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2.5 flex items-center justify-between">
+                    <span class="flex items-center gap-1.5">
+                        📁 標籤多存檔管理 (Label Profiles)
+                    </span>
+                    <span id="cloud-status-indicator" class="text-[10px] font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200/60">
+                        ⏳ 雲端同步連線中...
+                    </span>
+                </h2>
+                
+                <div class="flex flex-col gap-3">
+                    <div class="flex gap-2">
+                        <select id="profile-select" class="flex-1 px-3 py-1.5 border border-slate-200 rounded-lg text-xs bg-white font-medium focus:ring-1 focus:ring-amber-500" onchange="onProfileSelectChange()">
+                            <option value="">-- 建立新存檔 --</option>
+                        </select>
+                    </div>
+                    
+                    <div class="flex gap-2">
+                        <input type="text" id="input-profile-name" placeholder="輸入此配方存檔名稱 (如: 經典原味)" class="flex-1 px-3 py-1.5 border border-slate-200 rounded-lg text-xs focus:ring-1 focus:ring-amber-500">
+                        <button onclick="handleSaveAction()" class="px-4 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold transition-all shadow-sm">💾 儲存存檔</button>
+                        <button onclick="deleteProfile()" id="btn-delete-profile" class="px-3 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 rounded-lg text-xs font-bold transition-all" disabled>🗑️ 刪除</button>
+                    </div>
+
+                    <div class="grid grid-cols-3 gap-2 pt-2 border-t border-slate-200/60 mt-1">
+                        <button onclick="fetchCloudProfiles()" class="flex items-center justify-center gap-1.5 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-200 rounded-lg text-[11px] font-semibold transition-all">
+                            ☁️ 雲端同步
+                        </button>
+                        <button onclick="exportProfilesToJSON()" class="flex items-center justify-center gap-1.5 py-1.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-lg text-[11px] font-semibold transition-all">
+                            📤 匯出備份 (JSON)
+                        </button>
+                        <button onclick="triggerJSONImport()" class="flex items-center justify-center gap-1.5 py-1.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-lg text-[11px] font-semibold transition-all">
+                            📥 匯入還原 (JSON)
+                        </button>
+                        <input type="file" id="input-import-json" accept=".json" class="hidden">
+                    </div>
+                </div>
+            </div>
+
+            <!-- 實體毫米尺寸 -->
+            <div class="border-t border-slate-100 pt-4">
+                <h2 class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">標籤紙張實體尺寸 (Dimentions)</h2>
+                
+                <div class="grid grid-cols-2 gap-3 mb-3">
+                    <div>
+                        <label class="block text-[11px] font-semibold text-slate-500 mb-1">紙張寬度 (Width mm)</label>
+                        <input type="number" id="input-label-w" value="50" min="10" max="200" class="w-full px-3 py-1.5 border border-slate-200 rounded-lg text-xs" oninput="onDimensionChange()">
+                    </div>
+                    <div>
+                        <label class="block text-[11px] font-semibold text-slate-500 mb-1">紙張高度 (Height mm)</label>
+                        <input type="number" id="input-label-h" value="60" min="10" max="200" class="w-full px-3 py-1.5 border border-slate-200 rounded-lg text-xs" oninput="onDimensionChange()">
+                    </div>
+                </div>
+
+                <div class="flex flex-wrap gap-1.5">
+                    <button onclick="setDimensionPreset(50, 60)" class="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 rounded-md text-[10px] font-bold text-slate-600">50x60mm (直式熱門)</button>
+                    <button onclick="setDimensionPreset(40, 40)" class="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 rounded-md text-[10px] font-bold text-slate-600">40x40mm (經典正方形)</button>
+                    <button onclick="setDimensionPreset(60, 40)" class="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 rounded-md text-[10px] font-bold text-slate-600">60x40mm (橫式烘焙)</button>
+                    <button onclick="setDimensionPreset(70, 50)" class="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 rounded-md text-[10px] font-bold text-slate-600">70x50mm (加大通用)</button>
+                </div>
+            </div>
+
+            <!-- 自訂 Logo 與 QR Code -->
+            <div class="border-t border-slate-100 pt-4">
+                <h2 class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">自訂上傳商標與動態 QR 碼</h2>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-[11px] font-semibold text-slate-500 mb-1">上傳 brand Logo (自訂替代小麥穗)</label>
+                        <div class="flex gap-2">
+                            <input type="file" id="input-logo" accept="image/*" class="flex-1 px-2 py-1 border border-slate-200 rounded-lg text-xs bg-white">
+                            <button onclick="clearLogo()" class="px-2 py-1 bg-slate-100 text-slate-600 rounded-lg text-xs font-medium hover:bg-slate-200">清除</button>
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-[11px] font-semibold text-slate-500 mb-1">生產追溯 QR 碼連結/內容 (留空不顯示)</label>
+                        <div class="flex gap-2">
+                            <input type="text" id="input-qr" placeholder="https://..." class="flex-1 px-3 py-1.5 border border-slate-200 rounded-lg text-xs" oninput="updateQRCode(this.value)">
+                            <button onclick="clearQR()" class="px-2 py-1 bg-slate-100 text-slate-600 rounded-lg text-xs font-medium hover:bg-slate-200">清除</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 風格選擇 Presets -->
+            <div class="border-t border-slate-100 pt-4">
+                <h2 class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2.5">選擇設計風格 Presets</h2>
+                <div class="grid grid-cols-2 gap-2">
+                    <button onclick="applyPreset('royal')" class="p-2.5 text-left border rounded-xl hover:border-amber-400 focus:outline-none transition-all bg-amber-50/20 border-amber-200">
+                        <span class="block text-xs font-bold text-amber-900">巴黎皇室</span>
+                        <span class="block text-[10px] text-amber-700">經典雙金線框</span>
+                    </button>
+                    <button onclick="applyPreset('rustic')" class="p-2.5 text-left border rounded-xl hover:border-slate-400 focus:outline-none transition-all border-slate-200">
+                        <span class="block text-xs font-bold text-slate-800">手作烘焙</span>
+                        <span class="block text-[10px] text-slate-500">質感虛線邊框</span>
+                    </button>
+                    <button onclick="applyPreset('modern')" class="p-2.5 text-left border rounded-xl hover:border-slate-400 focus:outline-none transition-all border-slate-200">
+                        <span class="block text-xs font-bold text-slate-800">北歐極簡</span>
+                        <span class="block text-[10px] text-slate-500">俐落黑單線時尚風</span>
+                    </button>
+                    <button onclick="applyPreset('vintage')" class="p-2.5 text-left border rounded-xl hover:border-slate-400 focus:outline-none transition-all border-slate-200">
+                        <span class="block text-xs font-bold text-emerald-900">莊園復古</span>
+                        <span class="block text-[10px] text-emerald-700">經典草綠典雅調</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- 標籤文字與資訊編輯 -->
+            <div class="border-t border-slate-100 pt-4">
+                <h2 class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">標籤文字與資訊編輯</h2>
+                
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-[11px] font-semibold text-slate-500 uppercase mb-1">主標題 (Title) (支援按 Enter 鍵換行)</label>
+                        <textarea id="input-title" rows="2" class="custom-textarea" oninput="updateLabelText()">ORIGINAL FRENCH SABLÉ BRETON</textarea>
+                    </div>
+
+                    <!-- 配方成分 與 過敏原關鍵字 (分開 2 欄) -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 bg-slate-50 p-4 rounded-xl border border-slate-200">
+                        <!-- 欄位 1: 產品配方與成分 -->
+                        <div>
+                            <label class="block text-[11px] font-bold text-slate-700 mb-1 flex items-center gap-1.5">
+                                <span class="bg-emerald-600 text-white rounded-full w-4 h-4 text-[9px] flex items-center justify-center">1</span>
+                                產品配方與成分 (Ingredients)
+                            </label>
+                            <textarea id="input-ingredients" rows="4" class="custom-textarea font-mono" oninput="updateLabelText()" placeholder="請輸入完整的配方配料，例如: WHEAT Flour, BUTTER (MILK), Salt..."></textarea>
+                        </div>
+
+                        <!-- 欄位 2: 過敏原自動比對關鍵字 (新增🔐鎖定開關) -->
+                        <div>
+                            <div class="flex justify-between items-center mb-1">
+                                <label class="block text-[11px] font-bold text-slate-700 flex items-center gap-1.5">
+                                    <span class="bg-amber-600 text-white rounded-full w-4 h-4 text-[9px] flex items-center justify-center">2</span>
+                                    過敏原自動加粗關鍵字 (用英文逗號隔開)
+                                </label>
+                                <!-- 🔐 鎖定開關按鈕 -->
+                                <button id="btn-lock-allergens" onclick="toggleAllergenLock()" class="text-[10px] px-2 py-0.5 rounded font-bold transition-all flex items-center gap-1 bg-slate-100 text-slate-600 border border-slate-200 hover:bg-slate-200 shadow-sm">
+                                    <span id="lock-icon">🔓</span> <span id="lock-text">未鎖定 (隨存檔變更)</span>
+                                </button>
+                            </div>
+                            <textarea id="input-allergen-keywords" rows="4" class="custom-textarea font-mono" oninput="onAllergenKeywordsInput()" placeholder="例如: WHEAT, GLUTEN, BUTTER, MILK, EGG, 小麥, 麩質, 牛奶, 奶油"></textarea>
+                        </div>
+                    </div>
+
+                    <!-- 過敏警告 -->
+                    <div>
+                        <label class="block text-[11px] font-semibold text-slate-500 uppercase mb-1">過敏提示警告 (Allergen Warning) (支援按 Enter 鍵換行)</label>
+                        <textarea id="input-allergen-warning" rows="2" class="custom-textarea" oninput="updateLabelText()">For allergens, see ingredients listed in BOLD.</textarea>
+                    </div>
+
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-[11px] font-semibold text-slate-500 uppercase mb-1">產品淨重 (Net Weight)</label>
+                            <input type="text" id="input-net-weight" value="Net Weight: 150g" class="w-full px-3 py-1.5 border border-slate-200 rounded-lg text-xs focus:ring-1 focus:ring-amber-500" oninput="updateLabelText()">
+                        </div>
+                        <div>
+                            <label class="block text-[11px] font-semibold text-slate-500 uppercase mb-1">貯存方式 (Storage Instructions)</label>
+                            <input type="text" id="input-storage" value="Store in a cool, dry place." class="w-full px-3 py-1.5 border border-slate-200 rounded-lg text-xs focus:ring-1 focus:ring-amber-500" oninput="updateLabelText()">
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-[11px] font-semibold text-slate-500 uppercase mb-1">最佳食用日期 (Best Before)</label>
+                            <input type="text" id="input-bb-date" value="21 / 06 / 2026" class="w-full px-3 py-1.5 border border-slate-200 rounded-lg text-xs focus:ring-1 focus:ring-amber-500" oninput="updateLabelText()">
+                        </div>
+                        <div>
+                            <label class="block text-[11px] font-semibold text-slate-500 uppercase mb-1">製造商 (Made by) (支援換行)</label>
+                            <textarea id="input-maker" rows="2" class="custom-textarea" oninput="updateLabelText()">A Cooking Day (CH3 6ET)</textarea>
+                        </div>
+                    </div>
+
+                    <!-- 製造廠地址欄 -->
+                    <div>
+                        <label class="block text-[11px] font-semibold text-slate-500 uppercase mb-1">製造廠地址 (Factory Address) (支援按 Enter 鍵換行)</label>
+                        <textarea id="input-address" rows="2" class="custom-textarea" oninput="updateLabelText()">Factory Address: CH3 6ET, UK</textarea>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 自訂字體與邊框色系 -->
+            <div class="border-t border-slate-100 pt-4">
+                <h2 class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">自訂色彩與主字體</h2>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-[11px] font-semibold text-slate-500 mb-1">標題字體</label>
+                        <select id="select-font-title" class="w-full px-2 py-1.5 border border-slate-200 rounded-lg text-xs bg-white" onchange="updateStyles()">
+                            <option value="'Cinzel', serif">Cinzel (法式皇室)</option>
+                            <option value="'Playfair Display', serif">Playfair (典雅襯線)</option>
+                            <option value="'Montserrat', sans-serif">Montserrat (現代無襯線)</option>
+                            <option value="Georgia, serif">Georgia (傳統復古)</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-[11px] font-semibold text-slate-500 mb-1">主邊框色系</label>
+                        <select id="select-accent-color" class="w-full px-2 py-1.5 border border-slate-200 rounded-lg text-xs bg-white" onchange="updateStyles()">
+                            <option value="#A38051">香檳奢華金 (#A38051)</option>
+                            <option value="#1E293B">深石板灰黑 (#1E293B)</option>
+                            <option value="#1F3A52">凡爾賽皇家藍 (#1F3A52)</option>
+                            <option value="#4F5D4B">香草羅勒綠 (#4F5D4B)</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <div class="hidden print-wrapper">
+        <div id="print-area"></div>
+    </div>
+
+    <script>
+        const PRESETS = {
+            royal: {
+                accent: '#A38051',
+                text: '#1C2321',
+                titleFont: "'Cinzel', serif",
+                hasDoubleFrame: true,
+                crestDisplay: 'block'
+            },
+            rustic: {
+                accent: '#473C2A',
+                text: '#2B2318',
+                titleFont: "Georgia, serif",
+                hasDoubleFrame: false,
+                crestDisplay: 'none'
+            },
+            modern: {
+                accent: '#111111',
+                text: '#111111',
+                titleFont: "'Montserrat', sans-serif",
+                hasDoubleFrame: false,
+                crestDisplay: 'none'
+            },
+            vintage: {
+                accent: '#4F5D4B',
+                text: '#2F3E2D',
+                titleFont: "'Playfair Display', serif",
+                hasDoubleFrame: true,
+                crestDisplay: 'block'
+            }
+        };
+
+        // Google Sheets Apps Script API 端點
+        const webAppUrl = "https://script.google.com/macros/s/AKfycbxgkzVV7iKFOnFru8gZ8Z2qoWvoqfIOfocPxqPXPKmBuqXjwEAKNRI7SH1qcx3hgDjA5g/exec";
+
+        let currentQRText = "";
+        let qrGenerator = null;
+        let localProfiles = {};
+        
+        // 髒資料追蹤 (用於未儲存變更之防呆)
+        let lastSavedStateString = "";
+        let currentLoadedProfileName = "";
+
+        // 提示 Banner (Toast) 顯示控制
+        function showToast(text) {
+            const toast = document.getElementById('toast');
+            toast.innerText = text;
+            toast.style.opacity = '1';
+            setTimeout(() => {
+                toast.style.opacity = '0';
+            }, 2500);
+        }
+
+        // ================= 📐 標籤尺寸調整與自適應計算 =================
+        function onDimensionChange() {
+            const wMm = parseFloat(document.getElementById('input-label-w').value) || 50;
+            const hMm = parseFloat(document.getElementById('input-label-h').value) || 60;
+            
+            // 標籤尺寸最大預覽框定為 350x420 像素以保證不撐爆螢幕
+            const maxW = 350;
+            const maxH = 420;
+            
+            let renderW = maxW;
+            let renderH = (hMm / wMm) * renderW;
+            if (renderH > maxH) {
+                renderH = maxH;
+                renderW = (wMm / hMm) * renderH;
+            }
+            
+            const root = document.documentElement;
+            root.style.setProperty('--label-width', `${renderW}px`);
+            root.style.setProperty('--label-height', `${renderH}px`);
+            
+            document.getElementById('label-dimension-tag').innerText = `${wMm}x${hMm}mm`;
+            
+            // 1.2mm 像素底線保障
+            const minPrintFontSizePx = 1.2 * (renderW / wMm);
+            root.style.setProperty('--min-print-font', `${minPrintFontSizePx}px`);
+
+            // 動態更新所有間距數值顯示
+            updateAllergenGap(document.getElementById('scale-gap').value);
+            updateTopGap(document.getElementById('scale-top-gap').value);
+            updateNetweightGap(document.getElementById('scale-netweight-gap').value);
+            updateFooterGap(document.getElementById('scale-footer-gap').value);
+            updateFooterOffset(document.getElementById('scale-footer-offset').value);
+            updateTitleOffset(document.getElementById('scale-title-offset').value);
+        }
+
+        function setDimensionPreset(w, h) {
+            document.getElementById('input-label-w').value = w;
+            document.getElementById('input-label-h').value = h;
+            onDimensionChange();
+            showToast(`已套用紙張尺寸: ${w} x ${h} mm`);
+        }
+
+        // ================= ☁️ Google Sheets 雲端連線與同步系統 =================
+        async function fetchCloudProfiles() {
+            const indicator = document.getElementById('cloud-status-indicator');
+            try {
+                indicator.innerText = "⏳ 雲端同步中...";
+                indicator.className = "text-[10px] font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200/60";
+                
+                const response = await fetch(`${webAppUrl}?_=${Date.now()}`);
+                if (!response.ok) throw new Error("Google Sheets 連線失敗");
+                
+                const cloudData = await response.json();
+                const formattedProfiles = {};
+
+                if (cloudData && typeof cloudData === 'object' && !Array.isArray(cloudData)) {
+                    Object.keys(cloudData).forEach(key => {
+                        const row = cloudData[key];
+                        if (row) {
+                            formattedProfiles[key] = {
+                                title: row.title || "",
+                                ingredients: row.ingredients || "",
+                                allergen: row.allergen || "",
+                                netWeight: row.netWeight || "",
+                                storage: row.storage || "",
+                                bbDate: row.bbDate || "",
+                                maker: row.maker || "",
+                                address: row.address || row.Address || "",
+                                allergenKeywords: row.allergenKeywords || row.AllergenKeywords || row.allergenkeywords || "WHEAT, GLUTEN, BUTTER, MILK, EGG", // 雲端多大小寫容錯對接
+                                fontTitle: row.fontTitle || "'Cinzel', serif",
+                                bgColor: "#FFFFFF",
+                                accentColor: row.accentColor || "#A38051",
+                                labelW: parseFloat(row.labelW) || 50,
+                                labelH: parseFloat(row.labelH) || 60,
+                                scaleAll: parseFloat(row.scaleAll) || 1.00,
+                                scaleTitle: parseFloat(row.scaleTitle) || 1.00,
+                                scaleLogo: parseFloat(row.scaleLogo) || 1.00,
+                                scaleQr: parseFloat(row.scaleQr) || 1.00,
+                                scaleGap: parseFloat(row.scaleGap) || 0.015,
+                                scaleTopGap: parseFloat(row.scaleTopGap) || 0.015,
+                                scaleNetweightGap: parseFloat(row.scaleNetweightGap) || 0.015,
+                                scaleFooterGap: parseFloat(row.scaleFooterGap) || 0.015,
+                                scaleFooterOffset: parseFloat(row.scaleFooterOffset) || 0.00,
+                                scaleAddress: parseFloat(row.scaleAddress) || 1.00, // 雲端字段對接
+                                scaleTitleOffset: parseFloat(row.scaleTitleOffset) || 0.00, // 雲端字段對接
+                                customLogo: row.customLogo || "",
+                                qrText: row.qrText || ""
+                            };
+                        }
+                    });
+                } else if (Array.isArray(cloudData)) {
+                    cloudData.forEach(row => {
+                        const name = row.profileName || row[0];
+                        if (name) {
+                            formattedProfiles[name] = {
+                                title: row.title || "",
+                                ingredients: row.ingredients || "",
+                                allergen: row.allergen || "",
+                                netWeight: row.netWeight || "",
+                                storage: row.storage || "",
+                                bbDate: row.bbDate || "",
+                                maker: row.maker || "",
+                                address: row.address || row.Address || "",
+                                allergenKeywords: row.allergenKeywords || row.AllergenKeywords || row.allergenkeywords || "WHEAT, GLUTEN, BUTTER, MILK, EGG", // 雲端多大小寫容錯對接
+                                fontTitle: row.fontTitle || "'Cinzel', serif",
+                                bgColor: "#FFFFFF",
+                                accentColor: row.accentColor || "#A38051",
+                                labelW: parseFloat(row.labelW) || 50,
+                                labelH: parseFloat(row.labelH) || 60,
+                                scaleAll: parseFloat(row.scaleAll) || 1.00,
+                                scaleTitle: parseFloat(row.scaleTitle) || 1.00,
+                                scaleLogo: parseFloat(row.scaleLogo) || 1.00,
+                                scaleQr: parseFloat(row.scaleQr) || 1.00,
+                                scaleGap: parseFloat(row.scaleGap) || 0.015,
+                                scaleTopGap: parseFloat(row.scaleTopGap) || 0.015,
+                                scaleNetweightGap: parseFloat(row.scaleNetweightGap) || 0.015,
+                                scaleFooterGap: parseFloat(row.scaleFooterGap) || 0.015,
+                                scaleFooterOffset: parseFloat(row.scaleFooterOffset) || 0.00,
+                                scaleAddress: parseFloat(row.scaleAddress) || 1.00, // 雲端字段對接
+                                scaleTitleOffset: parseFloat(row.scaleTitleOffset) || 0.00, // 雲端字段對接
+                                customLogo: row.customLogo || "",
+                                qrText: row.qrText || ""
+                            };
+                        }
+                    });
+                }
+                
+                localProfiles = formattedProfiles;
+                localStorage.setItem('sable-label-profiles-v3', JSON.stringify(localProfiles));
+                updateProfileDropdown();
+                
+                indicator.innerText = "🟢 雲端數據庫已連線";
+                indicator.className = "text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200/60";
+                
+                if (currentLoadedProfileName) {
+                    document.getElementById('profile-select').value = currentLoadedProfileName;
+                }
+            } catch (err) {
+                console.warn("雲端同步異常: ", err.message);
+                indicator.innerText = "🔴 本地離線緩存模式";
+                indicator.className = "text-[10px] font-bold text-rose-700 bg-rose-50 px-2 py-0.5 rounded-full border border-rose-200/60";
+                showToast("⚠️ 雲端連線失敗，自動啟用本地快取模式。");
+            }
+        }
+
+        // 推送配方至雲端試算表
+        async function saveCloudProfile(name, data) {
+            try {
+                // 【核心修正：將所有排版滑桿的大細、間距、位移等設定完整寫入 payload，好讓雲端自動動態新增欄位與永久儲存設定】
+                const payload = {
+                    action: "save",
+                    profileName: name,
+                    title: data.title,
+                    ingredients: data.ingredients,
+                    allergen: data.allergen,
+                    netWeight: data.netWeight,
+                    storage: data.storage,
+                    bbDate: data.bbDate,
+                    maker: data.maker,
+                    address: data.address,
+                    allergenKeywords: data.allergenKeywords,
+                    fontTitle: data.fontTitle,
+                    accentColor: data.accentColor,
+                    labelW: data.labelW,
+                    labelH: data.labelH,
+                    scaleAll: data.scaleAll,
+                    scaleTitle: data.scaleTitle,
+                    scaleLogo: data.scaleLogo,
+                    scaleQr: data.scaleQr,
+                    scaleGap: data.scaleGap,
+                    scaleTopGap: data.scaleTopGap,
+                    scaleNetweightGap: data.scaleNetweightGap,
+                    scaleFooterGap: data.scaleFooterGap,
+                    scaleFooterOffset: data.scaleFooterOffset,
+                    scaleAddress: data.scaleAddress,       // 獨立地址大小
+                    scaleTitleOffset: data.scaleTitleOffset // 主標題上下位移
+                };
+                
+                await fetch(webAppUrl, {
+                    method: "POST",
+                    mode: "no-cors",
+                    headers: { "Content-Type": "text/plain" },
+                    body: JSON.stringify(payload)
+                });
+            } catch (err) {
+                console.warn("雲端推送異常: ", err.message);
+            }
+        }
+
+        // 從雲端試算表刪除配方
+        async function deleteCloudProfile(name) {
+            try {
+                const payload = {
+                    action: "delete",
+                    profileName: name
+                };
+                await fetch(webAppUrl, {
+                    method: "POST",
+                    mode: "no-cors",
+                    headers: { "Content-Type": "text/plain" },
+                    body: JSON.stringify(payload)
+                });
+            } catch (err) {
+                console.warn("雲端刪除異常: ", err.message);
+            }
+        }
+
+        // ================= 📁 標籤多配方本地存檔系統 =================
+        function loadAllProfiles() {
+            const saved = localStorage.getItem('sable-label-profiles-v3');
+            if (saved) {
+                localProfiles = JSON.parse(saved);
+            } else {
+                localProfiles = {};
+            }
+            updateProfileDropdown();
+            fetchCloudProfiles();
+        }
+
+        function updateProfileDropdown() {
+            const select = document.getElementById('profile-select');
+            select.innerHTML = '<option value="">-- 建立新存檔 --</option>';
+            
+            Object.keys(localProfiles).forEach(name => {
+                const opt = document.createElement('option');
+                opt.value = name;
+                opt.innerText = name;
+                select.appendChild(opt);
+            });
+            onProfileSelect();
+        }
+
+        // 下拉選單變更時自動觸發讀取 + 髒資料檢測
+        function onProfileSelectChange() {
+            const select = document.getElementById('profile-select');
+            const targetVal = select.value;
+            
+            // 偵測未儲存的修改
+            const currentStateString = JSON.stringify(captureStateData());
+            if (lastSavedStateString && lastSavedStateString !== currentStateString) {
+                const discard = confirm("偵測到有未儲存的修改，確定要放棄並讀取新檔案嗎？");
+                if (!discard) {
+                    select.value = currentLoadedProfileName; // 還原選取
+                    return;
+                }
+            }
+            
+            currentLoadedProfileName = targetVal;
+            if (targetVal === "") {
+                document.getElementById('input-profile-name').value = "";
+            } else {
+                document.getElementById('input-profile-name').value = targetVal;
+                applyStateData(localProfiles[targetVal]);
+            }
+            onProfileSelect(); // 刷新按鈕禁用狀態
+        }
+
+        function onProfileSelect() {
+            const select = document.getElementById('profile-select');
+            const selectedName = select.value;
+            const hasSelected = selectedName !== "";
+            document.getElementById('btn-delete-profile').disabled = !hasSelected;
+        }
+
+        // 合併儲存按鈕處理
+        async function handleSaveAction() {
+            const nameInput = document.getElementById('input-profile-name');
+            const name = nameInput.value.trim();
+            if (!name) {
+                showToast("⚠️ 請先輸入配方存檔名稱！");
+                return;
+            }
+
+            // 若名稱已存在，進行二次覆蓋確認
+            if (localProfiles[name]) {
+                const overwrite = confirm(`此存檔名稱「${name}」已存在，確定要覆蓋嗎？`);
+                if (!overwrite) return;
+            }
+
+            const data = captureStateData();
+            localProfiles[name] = data;
+            localStorage.setItem('sable-label-profiles-v3', JSON.stringify(localProfiles));
+            
+            // 推送並寫入雲端 Google Sheets (會自動辨識並覆盖或新增)
+            await saveCloudProfile(name, data);
+            
+            // 重新刷新列表與高亮選取
+            updateProfileDropdown();
+            document.getElementById('profile-select').value = name;
+            currentLoadedProfileName = name;
+            onProfileSelect();
+            
+            // 更新狀態雜湊
+            lastSavedStateString = JSON.stringify(captureStateData());
+            showToast(`💾 成功儲存並同步雲端配方「${name}」！`);
+        }
+
+        // 刪除存檔
+        async function deleteProfile() {
+            const select = document.getElementById('profile-select');
+            const selectedName = select.value;
+            if (!selectedName) return;
+
+            const confirmDel = confirm(`確定要從本地和雲端永久刪除配方「${selectedName}」嗎？`);
+            if (!confirmDel) return;
+
+            delete localProfiles[selectedName];
+            localStorage.setItem('sable-label-profiles-v3', JSON.stringify(localProfiles));
+            
+            await deleteCloudProfile(selectedName);
+            
+            currentLoadedProfileName = "";
+            lastSavedStateString = "";
+            loadAllProfiles();
+            showToast(`🗑️ 已同步從本地與雲端刪除配方「${selectedName}」`);
+        }
+
+        // 匯出所有配方為 JSON
+        function exportProfilesToJSON() {
+            if (Object.keys(localProfiles).length === 0) {
+                showToast("⚠️ 目前沒有任何存檔可以匯出！");
+                return;
+            }
+            const jsonString = JSON.stringify(localProfiles, null, 2);
+            const blob = new Blob([jsonString], {type: "application/json"});
+            const url = URL.createObjectURL(blob);
+            
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `sable_breton_profiles_backup_${new Date().toISOString().slice(0,10)}.json`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(url);
+            showToast("📤 成功導出所有配方備份檔！");
+        }
+
+        // 觸發 JSON 檔案匯入
+        function triggerJSONImport() {
+            document.getElementById('input-import-json').click();
+        }
+
+        // 前端匯入並發起後端完全覆寫還原
+        function importProfilesFromJSON(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            // 嚴肅防呆警告
+            const confirmRestore = confirm("⚠️ 警告：此操作將會清空雲端現有的所有存檔，並用備份檔案完全覆蓋！確定要繼續嗎？");
+            if (!confirmRestore) {
+                e.target.value = ""; 
+                return;
+            }
+
+            const reader = new FileReader();
+            reader.onload = async function(event) {
+                try {
+                    const importedData = JSON.parse(event.target.result);
+                    if (typeof importedData !== 'object' || importedData === null || Array.isArray(importedData)) {
+                        throw new Error("格式不正確");
+                    }
+
+                    // 1. 本地 LocalStorage 覆蓋
+                    localProfiles = Object.assign({}, localProfiles, importedData);
+                    localStorage.setItem('sable-label-profiles-v3', JSON.stringify(localProfiles));
+                    
+                    // 2. 下拉選單重置
+                    updateProfileDropdown();
+                    
+                    // 3. 呼叫後端進行完全覆蓋還原 (restore_all)
+                    await restoreAllCloudProfiles(importedData);
+
+                    // 4. 自動套用並填入匯入的第一個配方
+                    const importedNames = Object.keys(importedData);
+                    if (importedNames.length > 0) {
+                        const firstProfileName = importedNames[0];
+                        document.getElementById('profile-select').value = firstProfileName;
+                        onProfileSelect();
+                        applyStateData(localProfiles[firstProfileName]);
+                        showToast(`📥 成功還原並自動套用「${firstProfileName}」配方！`);
+                    } else {
+                        loadAllProfiles();
+                        showToast("📥 還原成功！雲端及本地存檔已清空初始化。");
+                    }
+                } catch (err) {
+                    console.warn("JSON 還原出錯: ", err.message);
+                    showToast("❌ 匯入還原失敗，請確認是否為正確的備份 JSON 檔案！");
+                }
+                e.target.value = "";
+            };
+            reader.readAsText(file);
+        }
+
+        // 發送整批備份還原至雲端
+        async function restoreAllCloudProfiles(profilesData) {
+            const indicator = document.getElementById('cloud-status-indicator');
+            try {
+                indicator.innerText = "⏳ 雲端還原中...";
+                indicator.className = "text-[10px] font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200/60";
+                
+                const payload = {
+                    action: "restore_all",
+                    profiles: profilesData
+                };
+                
+                await fetch(webAppUrl, {
+                    method: "POST",
+                    mode: "no-cors",
+                    headers: { "Content-Type": "text/plain" },
+                    body: JSON.stringify(payload)
+                });
+                
+                indicator.innerText = "🟢 雲端數據庫已連線";
+                indicator.className = "text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200/60";
+            } catch (err) {
+                console.warn("雲端還原異常: ", err.message);
+                showToast("⚠️ 雲端還原失敗，請檢查網路連線狀態！");
+            }
+        }
+
+        // 擷取當前所有 Input 與樣式狀態 (強制底紙鎖定白色)
+        function captureStateData() {
+            return {
+                title: document.getElementById('input-title').value,
+                ingredients: document.getElementById('input-ingredients').value,
+                allergenKeywords: document.getElementById('input-allergen-keywords').value, // 擷取過敏原關鍵字
+                allergen: document.getElementById('input-allergen-warning').value,
+                netWeight: document.getElementById('input-net-weight').value, 
+                storage: document.getElementById('input-storage').value,       
+                bbDate: document.getElementById('input-bb-date').value,
+                maker: document.getElementById('input-maker').value,
+                address: document.getElementById('input-address').value,
+                fontTitle: document.getElementById('select-font-title').value,
+                bgColor: "#FFFFFF", 
+                accentColor: document.getElementById('select-accent-color').value,
+                labelW: document.getElementById('input-label-w').value,
+                labelH: document.getElementById('input-label-h').value,
+                scaleAll: document.getElementById('scale-all').value,
+                scaleTitle: document.getElementById('scale-title').value,
+                scaleLogo: document.getElementById('scale-logo').value,
+                scaleQr: document.getElementById('scale-qr').value,
+                scaleGap: document.getElementById('scale-gap').value,
+                scaleTopGap: document.getElementById('scale-top-gap').value, 
+                scaleNetweightGap: document.getElementById('scale-netweight-gap').value, 
+                scaleFooterGap: document.getElementById('scale-footer-gap').value, 
+                scaleFooterOffset: document.getElementById('scale-footer-offset').value, // 儲存底部偏移值
+                scaleAddress: document.getElementById('scale-address').value, // 儲存獨立地址字體大細
+                scaleTitleOffset: document.getElementById('scale-title-offset').value, // 儲存主標題上下移數值
+                customLogo: document.getElementById('label-logo-img').src,
+                qrText: document.getElementById('input-qr').value
+            };
+        }
+
+        // 應用讀取的狀態
+        function applyStateData(data) {
+            document.getElementById('input-title').value = data.title || "";
+            document.getElementById('input-ingredients').value = data.ingredients || "";
+            
+            // 【核心修正：如啟用「智慧鎖定」，則不會被覆蓋，保持通用欄位】
+            if (!isAllergenLocked()) {
+                document.getElementById('input-allergen-keywords').value = data.allergenKeywords || "WHEAT, GLUTEN, BUTTER, MILK, EGG";
+            } else {
+                const globalShared = localStorage.getItem('sable-global-allergen-keywords');
+                if (globalShared !== null) {
+                    document.getElementById('input-allergen-keywords').value = globalShared;
+                }
+            }
+
+            document.getElementById('input-allergen-warning').value = data.allergen || "";
+            document.getElementById('input-net-weight').value = data.netWeight || "Net Weight: 150g"; 
+            document.getElementById('input-storage').value = data.storage || "Store in a cool, dry place."; 
+            document.getElementById('input-bb-date').value = data.bbDate || "";
+            document.getElementById('input-maker').value = data.maker || "";
+            document.getElementById('input-address').value = data.address || "Factory Address: CH3 6ET, UK";
+            document.getElementById('select-font-title').value = data.fontTitle || "'Cinzel', serif";
+            document.getElementById('select-accent-color').value = data.accentColor || "#A38051";
+            document.getElementById('input-label-w').value = data.labelW || 50;
+            document.getElementById('input-label-h').value = data.labelH || 60;
+            document.getElementById('scale-all').value = data.scaleAll || 1.00;
+            document.getElementById('scale-title').value = data.scaleTitle || 1.00;
+            document.getElementById('scale-logo').value = data.scaleLogo || 1.00;
+            document.getElementById('scale-qr').value = data.scaleQr || 1.00;
+            document.getElementById('scale-gap').value = data.scaleGap || 0.015;
+            document.getElementById('scale-top-gap').value = data.scaleTopGap || 0.015; 
+            document.getElementById('scale-netweight-gap').value = data.scaleNetweightGap || 0.015; 
+            document.getElementById('scale-footer-gap').value = data.scaleFooterGap || 0.015; 
+            document.getElementById('scale-footer-offset').value = data.scaleFooterOffset || 0.00; // 讀取底部偏移值
+            document.getElementById('scale-address').value = data.scaleAddress || 1.00; // 讀取獨立地址大細
+            document.getElementById('scale-title-offset').value = data.scaleTitleOffset || 0.00; // 讀取主標題上下移
+
+            // 【智慧 Logo 網址判定相容性提升】
+            if (data.customLogo && data.customLogo.trim() !== "" && !data.customLogo.includes("my-tool-cyan-zeta.vercel.app")) {
+                document.getElementById('label-logo-img').src = data.customLogo;
+                document.getElementById('logo-container').classList.remove('hidden');
+                document.getElementById('decor-crest').classList.add('hidden');
+                document.getElementById('logo-slider-group').classList.remove('hidden');
+            } else {
+                clearLogo();
+            }
+
+            document.getElementById('input-qr').value = data.qrText || "";
+            updateQRCode(data.qrText || "");
+
+            updateFontScale('all', data.scaleAll || 1.00);
+            updateFontScale('title', data.scaleTitle || 1.00);
+            updateFontScale('logo', data.scaleLogo || 1.00);
+            updateFontScale('qr', data.scaleQr || 1.00);
+            updateFontScale('address', data.scaleAddress || 1.00); // 載入獨立地址大細
+            updateAllergenGap(data.scaleGap || 0.015);
+            updateTopGap(data.scaleTopGap || 0.015); 
+            updateNetweightGap(data.scaleNetweightGap || 0.015); 
+            updateFooterGap(data.scaleFooterGap || 0.015); 
+            updateFooterOffset(data.scaleFooterOffset || 0.00); // 載入底部偏移渲染
+            updateTitleOffset(data.scaleTitleOffset || 0.00); // 載入主標題上下移渲染
+
+            onDimensionChange();
+            updateStyles();
+            updateLabelText();
+            
+            // 讀取成功後，更新目前儲存雜湊
+            lastSavedStateString = JSON.stringify(captureStateData());
+        }
+
+        // ================= 元素尺寸、間距微調 (DPI Safe) =================
+        function updateFontScale(type, value) {
+            const root = document.documentElement;
+            if (type === 'all') {
+                root.style.setProperty('--font-scale', value);
+                document.getElementById('scale-all').value = value;
+                document.getElementById('all-scale-num').innerText = `${Math.round(value * 100)}%`;
+            } else if (type === 'title') {
+                root.style.setProperty('--title-scale', value);
+                document.getElementById('scale-title').value = value;
+                document.getElementById('title-scale-num').innerText = `${Math.round(value * 100)}%`;
+            } else if (type === 'logo') {
+                root.style.setProperty('--logo-scale', value);
+                document.getElementById('scale-logo').value = value;
+                document.getElementById('logo-scale-num').innerText = `${Math.round(value * 100)}%`;
+            } else if (type === 'qr') {
+                root.style.setProperty('--qr-scale', value);
+                document.getElementById('scale-qr').value = value;
+                document.getElementById('qr-scale-num').innerText = `${Math.round(value * 100)}%`;
+            } else if (type === 'address') {
+                root.style.setProperty('--address-scale', value);
+                document.getElementById('scale-address').value = value;
+                document.getElementById('address-scale-num').innerText = `${Math.round(value * 100)}%`;
+            }
+            
+            onDimensionChange();
+        }
+
+        function updateAllergenGap(value) {
+            const root = document.documentElement;
+            root.style.setProperty('--allergen-gap', value);
+            document.getElementById('scale-gap').value = value;
+            
+            const rootW = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--label-width')) || 350;
+            document.getElementById('gap-scale-num').innerText = `${Math.round(rootW * value)} px`;
+        }
+
+        // 標題與內容距離
+        function updateTopGap(value) {
+            const root = document.documentElement;
+            root.style.setProperty('--top-gap', value);
+            document.getElementById('scale-top-gap').value = value;
+            
+            const rootW = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--label-width')) || 350;
+            document.getElementById('top-gap-scale-num').innerText = `${Math.round(rootW * value)} px`;
+        }
+
+        // 警告框與淨重/貯存距離
+        function updateNetweightGap(value) {
+            const root = document.documentElement;
+            root.style.setProperty('--netweight-gap', value);
+            document.getElementById('scale-netweight-gap').value = value;
+            
+            const rootW = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--label-width')) || 350;
+            document.getElementById('netweight-gap-scale-num').innerText = `${Math.round(rootW * value)} px`;
+        }
+
+        // 淨重/貯存與底部欄距離
+        function updateFooterGap(value) {
+            const root = document.documentElement;
+            root.style.setProperty('--footer-gap', value);
+            document.getElementById('scale-footer-gap').value = value;
+            
+            const rootW = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--label-width')) || 350;
+            const pxVal = Math.round(rootW * value);
+            document.getElementById('footer-gap-scale-num').innerText = `${pxVal > 0 ? '+' : ''}${pxVal} px`;
+        }
+
+        // 最底部資訊欄位移微調函數
+        function updateFooterOffset(value) {
+            const root = document.documentElement;
+            root.style.setProperty('--footer-offset', value);
+            document.getElementById('scale-footer-offset').value = value;
+            
+            const rootW = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--label-width')) || 350;
+            const pxVal = Math.round(rootW * value);
+            // 負值代表往上移
+            document.getElementById('footer-offset-scale-num').innerText = `${pxVal > 0 ? '+' : ''}${pxVal} px`;
+        }
+
+        // 主標題上下移微調函數
+        function updateTitleOffset(value) {
+            const root = document.documentElement;
+            root.style.setProperty('--title-offset', value);
+            document.getElementById('scale-title-offset').value = value;
+            
+            const rootW = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--label-width')) || 350;
+            const pxVal = Math.round(rootW * value);
+            // 負值代表往上移
+            document.getElementById('title-offset-scale-num').innerText = `${pxVal > 0 ? '+' : ''}${pxVal} px`;
+        }
+
+        function updatePreviewZoom(value) {
+            const root = document.documentElement;
+            root.style.setProperty('--preview-zoom', value);
+            document.getElementById('zoom-factor').innerText = `${Math.round(value * 100)}%`;
+            localStorage.setItem('sable-label-preview-zoom-v3', value);
+        }
+
+        function adjustPreviewZoom(delta) {
+            const slider = document.getElementById('preview-zoom-slider');
+            let val = parseFloat(slider.value) + delta;
+            val = Math.max(0.3, Math.min(2.5, val));
+            val = parseFloat(val.toFixed(2));
+            slider.value = val;
+            updatePreviewZoom(val);
+        }
+
+        function clearLogo() {
+            document.getElementById('input-logo').value = "";
+            document.getElementById('label-logo-img').src = "";
+            document.getElementById('logo-container').classList.add('hidden');
+            
+            const activePreset = document.getElementById('select-font-title').value;
+            if (activePreset.includes('Cinzel') || activePreset.includes('Playfair')) {
+                document.getElementById('decor-crest').classList.remove('hidden');
+            }
+            document.getElementById('logo-slider-group').classList.add('hidden');
+        }
+
+        function updateQRCode(text) {
+            currentQRText = text.trim();
+            const qrContainerDiv = document.getElementById('qr-container');
+            const qrCodeElement = document.getElementById('label-qr-code');
+            
+            if (currentQRText === "") {
+                qrContainerDiv.classList.add('hidden');
+                document.getElementById('qr-slider-group').classList.add('hidden');
+                return;
+            }
+
+            qrContainerDiv.classList.remove('hidden');
+            document.getElementById('qr-slider-group').classList.remove('hidden');
+            qrCodeElement.innerHTML = "";
+            qrGenerator = new QRCode(qrCodeElement, {
+                text: currentQRText,
+                width: 128,
+                height: 128,
+                colorDark : "#000000",
+                colorLight : "#ffffff",
+                correctLevel : QRCode.CorrectLevel.M
+            });
+        }
+
+        function clearQR() {
+            document.getElementById('input-qr').value = "";
+            updateQRCode("");
+        }
+
+        // ================= 🎯 【印刷安全】最高級別 8 倍超清無損 PNG 導出修正 =================
+        function exportLabelAsPNG() {
+            const label = document.getElementById('printable-label');
+            const pivot = document.getElementById('label-scale-pivot');
+
+            const currentZoom = parseFloat(document.getElementById('preview-zoom-slider').value) || 0.70;
+            const originalBoxShadow = label.style.boxShadow;
+            const viewport = document.getElementById('label-viewport');
+            
+            const originalViewportStyle = viewport.style.cssText;
+            viewport.style.height = 'auto';
+            viewport.style.minHeight = 'none';
+            viewport.style.maxHeight = 'none';
+            viewport.style.overflow = 'visible';
+
+            pivot.style.transform = 'none';
+            label.style.boxShadow = 'none';
+
+            setTimeout(() => {
+                html2canvas(label, {
+                    scale: 8, 
+                    useCORS: true,
+                    backgroundColor: null, 
+                    logging: false
+                }).then(canvas => {
+                    pivot.style.transform = `scale(${currentZoom})`;
+                    label.style.boxShadow = originalBoxShadow;
+                    viewport.style.cssText = originalViewportStyle;
+
+                    const link = document.createElement('a');
+                    link.download = `Sable_Breton_Label_UltraHD.png`;
+                    link.href = canvas.toDataURL('image/png');
+                    link.click();
+                }).catch(err => {
+                    console.warn("PNG 匯出發生故障: ", err.message);
+                    pivot.style.transform = `scale(${currentZoom})`;
+                    label.style.boxShadow = originalBoxShadow;
+                    viewport.style.cssText = originalViewportStyle;
+                });
+            }, 120);
+        }
+
+        // ================= 🔐 智慧通用鎖定機制控制程式 =================
+        function isAllergenLocked() {
+            return localStorage.getItem('sable-allergens-locked') === 'true';
+        }
+
+        function toggleAllergenLock() {
+            const currentlyLocked = isAllergenLocked();
+            const newLockedState = !currentlyLocked;
+            localStorage.setItem('sable-allergens-locked', newLockedState ? 'true' : 'false');
+            
+            if (newLockedState) {
+                // 鎖定時，將目前輸入的內容另存為「通用過敏原緩存」
+                const currentVal = document.getElementById('input-allergen-keywords').value;
+                localStorage.setItem('sable-global-allergen-keywords', currentVal);
+                showToast("🔒 智慧過敏原已鎖定為通用模式！");
+            } else {
+                showToast("🔓 智慧過敏原已解除鎖定，將隨存檔自動變更。");
+            }
+            
+            updateLockUI();
+        }
+
+        function updateLockUI() {
+            const locked = isAllergenLocked();
+            const btn = document.getElementById('btn-lock-allergens');
+            const icon = document.getElementById('lock-icon');
+            const text = document.getElementById('lock-text');
+            const textarea = document.getElementById('input-allergen-keywords');
+            
+            if (locked) {
+                btn.className = "text-[10px] px-2 py-0.5 rounded font-bold transition-all flex items-center gap-1 bg-amber-100 text-amber-800 border border-amber-300 hover:bg-amber-200 shadow-sm";
+                icon.innerText = "🔒";
+                text.innerText = "已鎖定 (通用且不可編輯)";
+                // 設定為唯讀並套用灰色禁用樣式與禁用游標
+                textarea.readOnly = true;
+                textarea.classList.add('bg-slate-100', 'text-slate-400', 'cursor-not-allowed', 'select-none');
+                textarea.classList.remove('bg-white');
+            } else {
+                btn.className = "text-[10px] px-2 py-0.5 rounded font-bold transition-all flex items-center gap-1 bg-slate-100 text-slate-600 border border-slate-200 hover:bg-slate-200 shadow-sm";
+                icon.innerText = "🔓";
+                text.innerText = "未鎖定 (隨存檔變更)";
+                // 解除唯讀並恢復一般輸入樣式
+                textarea.readOnly = false;
+                textarea.classList.remove('bg-slate-100', 'text-slate-400', 'cursor-not-allowed', 'select-none');
+                textarea.classList.add('bg-white');
+            }
+        }
+
+        function onAllergenKeywordsInput() {
+            // 如果是在鎖定狀態下手動修改，也即時更新通用緩存
+            if (isAllergenLocked()) {
+                const val = document.getElementById('input-allergen-keywords').value;
+                localStorage.setItem('sable-global-allergen-keywords', val);
+            }
+            updateLabelText();
+        }
+
+        // ================= 🧪 智慧過敏原自動識別與動態加粗引擎 =================
+        function highlightAllergens(text) {
+            const keywordsInput = document.getElementById('input-allergen-keywords').value;
+            const keywords = keywordsInput.split(/[,，]/).map(k => k.trim()).filter(k => k.length > 0);
+
+            // 1. 先處理手動加粗（把原本的 **文字** 暫時替換成特定臨時標記，避免重複渲染，完美匹配結尾雙星號）
+            let processed = text.replace(/\*\*(.*?)\*\*/g, '[BOLD_START]$1[BOLD_END]');
+
+            // 2. 自動比對並匹配輸入框中的所有自訂過敏原關鍵字
+            keywords.forEach(kw => {
+                const escapedKw = kw.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
+                const isEnglish = /^[A-Za-z0-9\s]+$/.test(kw);
+                let regex;
+                if (isEnglish) {
+                    regex = new RegExp(`\\b(${escapedKw})\\b`, 'gi'); 
+                } else {
+                    regex = new RegExp(`(${escapedKw})`, 'g'); 
+                }
+                processed = processed.replace(regex, '[AUTO_BOLD]$1[AUTO_BOLD_END]');
+            });
+
+            // 3. 統一將所有臨時標記轉換為 HTML 800 加粗樣式
+            processed = processed
+                .replace(/\[BOLD_START\]/g, '<strong style="color: var(--label-text); font-weight: 800;">')
+                .replace(/\[BOLD_END\]/g, '</strong>')
+                .replace(/\[AUTO_BOLD\]/g, '<strong style="color: var(--label-text); font-weight: 800;">')
+                .replace(/\[AUTO_BOLD_END\]/g, '</strong>');
+
+            return processed;
+        }
+
+        function updateLabelText() {
+            const title = document.getElementById('input-title').value;
+            const rawIngredients = document.getElementById('input-ingredients').value;
+            const allergenWarning = document.getElementById('input-allergen-warning').value;
+            const netWeight = document.getElementById('input-net-weight').value; 
+            const storage = document.getElementById('input-storage').value;       
+            const bbDate = document.getElementById('input-bb-date').value;
+            const maker = document.getElementById('input-maker').value;
+            const address = document.getElementById('input-address').value;
+
+            const cleanTitle = title.trim();
+            const cleanIngredients = rawIngredients.trim();
+            const cleanWarning = allergenWarning.trim();
+            const cleanAddress = address.trim();
+
+            const processedIngredients = highlightAllergens(cleanIngredients);
+
+            document.getElementById('label-title').innerHTML = cleanTitle;
+            document.getElementById('label-ingredients').innerHTML = processedIngredients;
+            document.getElementById('label-allergen').innerHTML = cleanWarning;
+            
+            document.getElementById('label-net-weight').innerHTML = netWeight; 
+            document.getElementById('label-storage').innerHTML = storage;       
+            
+            document.getElementById('label-bb-date').innerHTML = bbDate;
+            document.getElementById('label-maker').innerHTML = maker;
+            document.getElementById('label-address').innerHTML = cleanAddress;
+        }
+
+        function updateStyles() {
+            const root = document.documentElement;
+            const fontTitle = document.getElementById('select-font-title').value;
+            const accentColor = document.getElementById('select-accent-color').value;
+
+            root.style.setProperty('--label-bg', '#FFFFFF'); 
+            root.style.setProperty('--label-accent', accentColor);
+
+            const label = document.getElementById('printable-label');
+            label.style.backgroundColor = '#FFFFFF'; 
+            document.getElementById('label-title').style.fontFamily = fontTitle;
+        }
+
+        function applyPreset(presetKey) {
+            const preset = PRESETS[presetKey];
+            if (!preset) return;
+
+            const root = document.documentElement;
+            root.style.setProperty('--label-bg', '#FFFFFF'); 
+            root.style.setProperty('--label-accent', preset.accent);
+            root.style.setProperty('--label-text', preset.text);
+
+            document.getElementById('select-font-title').value = preset.titleFont;
+            document.getElementById('select-accent-color').value = preset.accent;
+
+            const outerWrapper = document.getElementById('outer-border-wrapper');
+            const innerWrapper = document.getElementById('inner-border-wrapper');
+            const crest = document.getElementById('decor-crest');
+            const hasLogo = document.getElementById('label-logo-img').src !== "";
+
+            const currentW = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--label-width')) || 350;
+
+            if (preset.hasDoubleFrame) {
+                outerWrapper.className = "outer-border-frame";
+                innerWrapper.className = "inner-border-frame";
+                innerWrapper.style.border = `calc(${currentW}px * 0.008) double ${preset.accent}`;
+                if (!hasLogo) crest.style.display = 'block';
+            } else {
+                outerWrapper.className = "h-full w-full";
+                innerWrapper.className = "h-full w-full p-4 flex flex-col justify-between box-sizing-border";
+                innerWrapper.style.border = `calc(${currentW}px * 0.005) ${presetKey === 'rustic' ? 'dashed' : 'solid'} ${preset.accent}`;
+                crest.style.display = 'none';
+            }
+
+            document.getElementById('label-title').style.fontFamily = preset.titleFont;
+            updateLabelText();
+        }
+
+        window.addEventListener('DOMContentLoaded', () => {
+            const inputLogo = document.getElementById('input-logo');
+            if (inputLogo) {
+                inputLogo.addEventListener('change', function(e) {
+                    const file = e.target.files[0];
+                    if (file) {
+                        const reader = new FileReader();
+                        reader.onload = function(event) {
+                            const logoImg = document.getElementById('label-logo-img');
+                            logoImg.src = event.target.result;
+                            
+                            document.getElementById('logo-container').classList.remove('hidden');
+                            document.getElementById('decor-crest').classList.add('hidden');
+                            document.getElementById('logo-slider-group').classList.remove('hidden');
+                        };
+                        reader.readAsDataURL(file);
+                    }
+                });
+            }
+
+            const inputImportJson = document.getElementById('input-import-json');
+            if (inputImportJson) {
+                inputImportJson.addEventListener('change', importProfilesFromJSON);
+            }
+
+            const cachedZoom = localStorage.getItem('sable-label-preview-zoom-v3');
+            const zoomVal = cachedZoom ? parseFloat(cachedZoom) : 0.70;
+            document.getElementById('preview-zoom-slider').value = zoomVal;
+            updatePreviewZoom(zoomVal);
+
+            const viewport = document.getElementById('label-viewport');
+            const dragHandle = document.getElementById('viewport-drag-handle');
+            const savedHeight = localStorage.getItem('sable-viewport-height');
+            
+            if (savedHeight && viewport) {
+                document.documentElement.style.setProperty('--viewport-height', savedHeight + 'px');
+            }
+
+            if (dragHandle && viewport) {
+                let isDragging = false;
+                let startY = 0;
+                let startHeight = 0;
+
+                const startDrag = (e) => {
+                    isDragging = true;
+                    startY = e.clientY || e.touches[0].clientY;
+                    startHeight = viewport.offsetHeight;
+                    dragHandle.classList.add('bg-amber-100');
+                    
+                    document.addEventListener('mousemove', onDrag);
+                    document.addEventListener('touchmove', onDrag, { passive: false });
+                    document.addEventListener('mouseup', stopDrag);
+                    document.addEventListener('touchend', stopDrag);
+                    
+                    if (e.cancelable) e.preventDefault();
+                };
+
+                const onDrag = (e) => {
+                    if (!isDragging) return;
+                    const currentY = e.clientY || e.touches[0].clientY;
+                    const deltaY = currentY - startY;
+                    let newHeight = startHeight + deltaY;
+                    newHeight = Math.max(120, Math.min(550, newHeight));
+                    
+                    document.documentElement.style.setProperty('--viewport-height', newHeight + 'px');
+                    localStorage.setItem('sable-viewport-height', newHeight + 'px');
+                    
+                    if (e.cancelable) e.preventDefault();
+                };
+
+                const stopDrag = () => {
+                    isDragging = false;
+                    dragHandle.classList.remove('bg-amber-100');
+                    document.removeEventListener('mousemove', onDrag);
+                    document.removeEventListener('touchmove', onDrag);
+                    document.removeEventListener('mouseup', stopDrag);
+                    document.removeEventListener('touchend', stopDrag);
+                };
+
+                dragHandle.addEventListener('mousedown', startDrag);
+                dragHandle.addEventListener('touchstart', startDrag, { passive: false });
+            }
+            
+            // 載入鎖定狀態
+            if (isAllergenLocked()) {
+                const globalShared = localStorage.getItem('sable-global-allergen-keywords');
+                if (globalShared !== null) {
+                    document.getElementById('input-allergen-keywords').value = globalShared;
+                }
+            }
+            updateLockUI();
+
+            loadAllProfiles();
+            onDimensionChange();
+            applyPreset('royal');
+            
+            // 初始記憶全體未更動的狀態
+            lastSavedStateString = JSON.stringify(captureStateData());
+        });
+    </script>
+</body>
+</html>
